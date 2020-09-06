@@ -9,13 +9,12 @@ Basic project using CameraX and ML-kit to decode bar and qr codes.
 - Included ML kit barcode dependencies
 - Implementing barcode decode in ImageAnalysis.Analyzer
 
-![CameraX block diagram](screenshots/cameraXdiagram.png)
-
-
 ![QR decode screenshot](screenshots/QR_detection.png)
+
+![CameraX block diagram](screenshots/cameraXdiagram.png)
 
 ## References
 
-![CameraX Codelab](https://codelabs.developers.google.com/codelabs/camerax-getting-started/#0)
+[CameraX Codelab](https://codelabs.developers.google.com/codelabs/camerax-getting-started/#0)
 
-![ML-Kit Barcode scanning](https://developers.google.com/ml-kit/vision/barcode-scanning/android)
+[ML-Kit Barcode scanning](https://developers.google.com/ml-kit/vision/barcode-scanning/android)
