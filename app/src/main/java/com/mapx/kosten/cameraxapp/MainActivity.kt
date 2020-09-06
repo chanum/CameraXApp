@@ -1,16 +1,20 @@
 package com.mapx.kosten.cameraxapp
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.net.Uri
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.google.mlkit.vision.barcode.Barcode
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.common.InputImage
 import kotlinx.android.synthetic.main.activity_main.*
 import java.io.File
 import java.nio.ByteBuffer
@@ -20,6 +24,7 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 typealias LumaListener = (luma: Double) -> Unit
+typealias BarCodeListener = (code: Barcode) -> Unit
 
 class MainActivity : AppCompatActivity()  {
     private var imageCapture: ImageCapture? = null
@@ -36,7 +41,8 @@ class MainActivity : AppCompatActivity()  {
             startCamera()
         } else {
             ActivityCompat.requestPermissions(
-                    this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
+                this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS
+            )
         }
 
         // Set up the listener for take photo button
@@ -55,9 +61,11 @@ class MainActivity : AppCompatActivity()  {
 
         // Create time-stamped output file to hold the image
         val photoFile = File(
-                outputDirectory,
-                SimpleDateFormat(FILENAME_FORMAT, Locale.US
-                ).format(System.currentTimeMillis()) + ".jpg")
+            outputDirectory,
+            SimpleDateFormat(
+                FILENAME_FORMAT, Locale.US
+            ).format(System.currentTimeMillis()) + ".jpg"
+        )
 
         // Create an OutputFileOptions object. This object is where you can specify things about
         // how you want your output to be. You want the output saved in the file we just created, so add your photoFile
@@ -67,18 +75,20 @@ class MainActivity : AppCompatActivity()  {
         // Set up image capture listener, which is triggered after photo has
         // been taken
         imageCapture.takePicture(
-                outputOptions, ContextCompat.getMainExecutor(this), object : ImageCapture.OnImageSavedCallback {
-            override fun onError(exc: ImageCaptureException) {
-                Log.e(TAG, "Photo capture failed: ${exc.message}", exc)
-            }
+            outputOptions,
+            ContextCompat.getMainExecutor(this),
+            object : ImageCapture.OnImageSavedCallback {
+                override fun onError(exc: ImageCaptureException) {
+                    Log.e(TAG, "Photo capture failed: ${exc.message}", exc)
+                }
 
-            override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                val savedUri = Uri.fromFile(photoFile)
-                val msg = "Photo capture succeeded: $savedUri"
-                Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
-                Log.d(TAG, msg)
-            }
-        })
+                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                    val savedUri = Uri.fromFile(photoFile)
+                    val msg = "Photo capture succeeded: $savedUri"
+                    Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
+                    Log.d(TAG, msg)
+                }
+            })
     }
 
     private fun startCamera() {
@@ -100,14 +110,22 @@ class MainActivity : AppCompatActivity()  {
             // from viewfinder, and then set it on the preview.
             // Preview
             val preview = Preview.Builder()
-                    .build()
-                    .also {
-                        it.setSurfaceProvider(viewFinder.createSurfaceProvider())
-                    }
+                .build()
+                .also {
+                    it.setSurfaceProvider(viewFinder.createSurfaceProvider())
+                }
 
             imageCapture = ImageCapture.Builder()
-                    .build()
+                .build()
 
+            val imageAnalyzer = ImageAnalysis.Builder()
+                .build()
+                .also {
+                    it.setAnalyzer(cameraExecutor, BarcodeAnalyzer {code ->
+                        Toast.makeText(this, "${code.rawValue}", Toast.LENGTH_LONG).show()
+                    })
+                }
+            /*
             val imageAnalyzer = ImageAnalysis.Builder()
                 .build()
                 .also {
@@ -115,7 +133,7 @@ class MainActivity : AppCompatActivity()  {
                         Log.d(TAG, "Average luminosity: $luma")
                     })
                 }
-
+            */
             // Create a CameraSelector object and select DEFAULT_BACK_CAMERA.
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
@@ -127,9 +145,10 @@ class MainActivity : AppCompatActivity()  {
 
                 // Bind use cases to camera
                 cameraProvider.bindToLifecycle(
-                        this, cameraSelector, preview, imageCapture, imageAnalyzer)
+                    this, cameraSelector, preview, imageCapture, imageAnalyzer
+                )
 
-            } catch(exc: Exception) {
+            } catch (exc: Exception) {
                 // There are a few ways this code could fail, like if the app is no longer in
                 // focus. Wrap this code in a catch block to log if there's a failure.
                 Log.e(TAG, "Use case binding failed", exc)
@@ -140,7 +159,8 @@ class MainActivity : AppCompatActivity()  {
 
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
         ContextCompat.checkSelfPermission(
-                baseContext, it) == PackageManager.PERMISSION_GRANTED
+            baseContext, it
+        ) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun getOutputDirectory(): File {
@@ -156,15 +176,18 @@ class MainActivity : AppCompatActivity()  {
     }
 
     override fun onRequestPermissionsResult(
-            requestCode: Int, permissions: Array<String>, grantResults:
-            IntArray) {
+        requestCode: Int, permissions: Array<String>, grantResults:
+        IntArray
+    ) {
         if (requestCode == REQUEST_CODE_PERMISSIONS) {
             if (allPermissionsGranted()) {
                 startCamera()
             } else {
-                Toast.makeText(this,
-                        "Permissions not granted by the user.",
-                        Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    this,
+                    "Permissions not granted by the user.",
+                    Toast.LENGTH_SHORT
+                ).show()
                 finish()
             }
         }
@@ -205,5 +228,36 @@ private class LuminosityAnalyzer(private val listener: LumaListener) : ImageAnal
         listener(luma)
 
         image.close()
+    }
+}
+
+private class BarcodeAnalyzer(private val listener: BarCodeListener) : ImageAnalysis.Analyzer {
+
+    @SuppressLint("UnsafeExperimentalUsageError")
+    override fun analyze(imageProxy: ImageProxy) {
+        val mediaImage = imageProxy.image
+        if (mediaImage != null) {
+            val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+            val scanner = BarcodeScanning.getClient()
+
+            val result = scanner.process(image)
+                .addOnSuccessListener { barcodes ->
+                    // Task completed successfully
+                    // ...
+                    if (barcodes.isNotEmpty()) {
+                        val rawValue: Barcode = barcodes.get(0)
+                        Log.d("BarcodeAnalyzer", "successfully $rawValue")
+                        listener(rawValue)
+                    }
+                    imageProxy.close()
+                }
+                .addOnFailureListener {
+                    // Task failed with an exception
+                    // ...
+                    Log.d("BarcodeAnalyzer", "fail")
+                    imageProxy.close()
+                }
+
+        }
     }
 }

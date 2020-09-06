@@ -47,4 +47,7 @@ dependencies {
     implementation "androidx.camera:camera-lifecycle:$camerax_version"
     // CameraX View class
     implementation "androidx.camera:camera-view:1.0.0-alpha15"
+
+    // ML kit barcode for bundling the model
+    implementation 'com.google.mlkit:barcode-scanning:16.0.3'
 }
